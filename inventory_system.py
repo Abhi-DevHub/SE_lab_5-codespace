@@ -1,61 +1,97 @@
 import json
-import logging
 from datetime import datetime
 
 # Global variable
 stock_data = {}
 
-def addItem(item="default", qty=0, logs=[]):
+
+def add_item(item="default", qty=0, logs=None):
+    if logs is None:
+        logs = []  # Fix for W0102: Dangerous default value
+    
     if not item:
         return
+    
     stock_data[item] = stock_data.get(item, 0) + qty
-    logs.append("%s: Added %d of %s" % (str(datetime.now()), qty, item))
+    # Use f-string for cleaner formatting
+    logs.append(f"{datetime.now()}: Added {qty} of {item}")
 
-def removeItem(item, qty):
+
+def remove_item(item, qty):
     try:
         stock_data[item] -= qty
         if stock_data[item] <= 0:
             del stock_data[item]
-    except:
+    except KeyError:
+        # Fix for W0702/E722: Use specific exception
         pass
 
-def getQty(item):
+
+def get_qty(item):
     return stock_data[item]
 
-def loadData(file="inventory.json"):
-    f = open(file, "r")
+
+def load_data(file="inventory.json"):
     global stock_data
-    stock_data = json.loads(f.read())
-    f.close()
+    try:
+        # Fix for R1732: Use 'with' and W1514: Specify encoding
+        with open(file, "r", encoding="utf-8") as f:
+            stock_data = json.loads(f.read())
+    except FileNotFoundError:
+        stock_data = {}  # Start with an empty inventory if no file
+    except json.JSONDecodeError:
+        print(f"Error: Could not decode {file}. Starting with empty inventory.")
+        stock_data = {}
 
-def saveData(file="inventory.json"):
-    f = open(file, "w")
-    f.write(json.dumps(stock_data))
-    f.close()
 
-def printData():
+def save_data(file="inventory.json"):
+    # Fix for R1732: Use 'with' and W1514: Specify encoding
+    with open(file, "w", encoding="utf-8") as f:
+        f.write(json.dumps(stock_data, indent=4))
+
+
+def print_data():
     print("Items Report")
+    print("------------------")
     for i in stock_data:
-        print(i, "->", stock_data[i])
+        print(f"{i} -> {stock_data[i]}")
+    print("------------------")
 
-def checkLowItems(threshold=5):
+
+def check_low_items(threshold=5):
     result = []
     for i in stock_data:
         if stock_data[i] < threshold:
             result.append(i)
     return result
 
-def main():
-    addItem("apple", 10)
-    addItem("banana", -2)
-    addItem(123, "ten")  # invalid types, no check
-    removeItem("apple", 3)
-    removeItem("orange", 1)
-    print("Apple stock:", getQty("apple"))
-    print("Low items:", checkLowItems())
-    saveData()
-    loadData()
-    printData()
-    eval("print('eval used')")  # dangerous
 
-main()
+def main():
+    load_data()  # Load first in case a file already exists
+    
+    add_item("apple", 10)
+    add_item("banana", -2)  # This is questionable logic, but we'll allow it
+    
+    # This line had multiple issues (type errors)
+    # add_item(123, "ten")  
+    # For now, let's add a valid item instead
+    add_item("orange", 20)
+
+    remove_item("apple", 3)
+    remove_item("grape", 1)  # This will silently fail (KeyError)
+    
+    try:
+        print(f"Apple stock: {get_qty('apple')}")
+    except KeyError:
+        print("Apple stock: 0")
+
+    print(f"Low items: {check_low_items()}")
+    
+    print_data()
+    save_data()
+    
+    # eval("print('eval used')")  # Fix for B307/W0123: Removed dangerous eval
+
+
+if __name__ == "__main__":
+    main()
